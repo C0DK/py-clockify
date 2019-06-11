@@ -1,7 +1,13 @@
-import requests
+"""
+The direct client of the Clockify API
+This creates direct requests to Clockify, and is the raw interface.
+"""
+
+from typing import Dict, Any, List, Union
 import urllib.parse
 from json import JSONDecodeError
-from typing import Dict, Any, List, Union
+
+import requests
 
 from .dataclasses import Workspace, User, Project, Task, Tag, TimeEntry, Client
 
@@ -9,19 +15,27 @@ BASE_URL = "https://api.clockify.me/api/v1/"
 
 
 class UnauthorizedRequest(Exception):
-    pass
+    """
+    When a request to some Clockify element is Unauthorized
+    """
 
 
 class ForbiddenRequest(Exception):
-    pass
+    """
+    When a request to some Clockify element is Forbidden
+    """
 
 
 class NotFoundException(Exception):
-    pass
+    """
+    When the element trying to be fetched is not found
+    """
 
 
 class ResponseNotJsonException(Exception):
-    pass
+    """
+    Thrown when response from Clockify isn't JSON and therefore cannot be decoded.
+    """
 
 
 class ClockifyClient:

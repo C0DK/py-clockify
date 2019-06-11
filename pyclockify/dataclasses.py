@@ -10,7 +10,11 @@ from enum import Enum, auto
 
 
 class CannotDecodeException(Exception):
-    pass
+    """
+    Exception thrown when the content cannot be decoded correctly.
+    Can either be due to an unimplemented feature, but most oftenly will be due to
+    changes in the API from clockify.
+    """
 
 
 def _estimate_to_timedelta(estimate: str) -> timedelta:
@@ -22,17 +26,21 @@ def _estimate_to_timedelta(estimate: str) -> timedelta:
     :return: a timedelta
     """
     estimate = estimate.split("PT")[1]
-    h, estimate = estimate.split("H") if "H" in estimate else (0, estimate)
-    m, estimate = estimate.split("M") if "M" in estimate else (0, estimate)
-    s = estimate.split("S")[0] if "S" in estimate else 0
-    h = int(h)
-    m = int(m)
-    s = int(s)
-    return timedelta(hours=h, minutes=m, seconds=s)
+    hours, estimate = estimate.split("H") if "H" in estimate else (0, estimate)
+    minutes, estimate = estimate.split("M") if "M" in estimate else (0, estimate)
+    seconds = estimate.split("S")[0] if "S" in estimate else 0
+    hours = int(hours)
+    minutes = int(minutes)
+    seconds = int(seconds)
+    return timedelta(hours=hours, minutes=minutes, seconds=seconds)
 
 
 @dataclass
 class HourlyRate:
+    """
+    The hourly paid rate of a given task, project or user.
+    In a currency with a certain amount
+    """
     currency: str
     amount: Decimal
 
@@ -43,6 +51,10 @@ class HourlyRate:
 
 @dataclass
 class Tag:
+    """
+    A tag that can be used to organize time entries
+    read more: https://clockify.me/help/time-tracking/categorizing-time-entries
+    """
     uid: str
     name: str
     workspace_id: str
@@ -54,6 +66,10 @@ class Tag:
 
 
 class MembershipStatus(Enum):
+    """
+    The status of a membership. is the user already a member?
+    is it pending? declined?
+    """
     PENDING = auto()
     ACTIVE = auto()
     DECLINED = auto()
@@ -61,6 +77,11 @@ class MembershipStatus(Enum):
 
     @staticmethod
     def from_json(data: str) -> "MembershipStatus":
+        """
+        Get a MembershipStatus from a string
+        :param data: the string to generate the enum from
+        :return: the generated MembershipStatus enum
+        """
         if data == "PENDING":
             return MembershipStatus.PENDING
         if data == "ACTIVE":
@@ -75,12 +96,16 @@ class MembershipStatus(Enum):
 
 @dataclass
 class Membership:
+    """
+    A membership.
+    When a user is a membership of some element
+    it can be a project, workspace or something else, depending on {membership_type}
+    """
     user_id: str
     target_id: str
     hourly_rate: Optional[HourlyRate]
     membership_status: MembershipStatus
-
-    # TODO implement the rest of membership stuff.
+    membership_type: str
 
     def __init__(self, data: Dict[str, Any]):
         self.user_id = data["userId"]
@@ -88,10 +113,21 @@ class Membership:
         data_hourly_rate = data["hourlyRate"]
         self.hourly_rate = HourlyRate(data_hourly_rate) if data_hourly_rate else None
         self.membership_status = MembershipStatus.from_json(data["membershipStatus"])
+        self.membership_type = data['membershipType']
 
 
 @dataclass
 class Workspace:
+    """
+    When you first create a Clockify account, you automatically get a workspace.
+    A workspace contains all the time entries, projects, people, and settings.
+
+    Workspace is the top level segregator, meaning that time entries, teams, clients,
+    and projects are assigned to just one workspace.
+    The only attribute that Workspaces have in common is you as a user.
+
+    Source: https://clockify.me/help/users/workspaces
+    """
     uid: str
     name: str
     settings: Dict[str, Any]
@@ -109,12 +145,20 @@ class Workspace:
 
 
 class UserStatus(Enum):
+    """
+    The current status of a user.
+    """
     ACTIVE = auto()
     PENDING_EMAIL_VERIFICATION = auto()
     DELETED = auto()
 
     @staticmethod
     def from_json(data: Dict[str, Any]) -> "UserStatus":
+        """
+        Get a UserStatus from a string
+        :param data: the string to generate the enum from
+        :return: the generated UserStatus enum
+        """
         if data == "ACTIVE":
             return UserStatus.ACTIVE
         if data == "PENDING_EMAIL_VERIFICATION":
@@ -126,11 +170,19 @@ class UserStatus(Enum):
 
 
 class EstimateType(Enum):
+    """
+    Whether the estimation was done manually
+    """
     AUTO = auto()
     MANUAL = auto()
 
     @staticmethod
     def from_json(data: str) -> "EstimateType":
+        """
+        Get a EstimateType from a string
+        :param data: the string to generate the enum from
+        :return: the generated EstimateType enum
+        """
         if data == "AUTO":
             return EstimateType.AUTO
         if data == "MANUAL":
@@ -141,6 +193,9 @@ class EstimateType(Enum):
 
 @dataclass
 class Estimate:
+    """
+    An estimation of the amount of time a given task will take
+    """
     estimate: timedelta
     of_type: EstimateType
 
@@ -151,6 +206,10 @@ class Estimate:
 
 @dataclass
 class Client:
+    """
+    A client of your workspace.
+    This is the client that the given project is done for.
+    """
     uid: str
     name: str
     workspace_id: str
@@ -162,11 +221,20 @@ class Client:
 
 
 class TaskStatus(Enum):
+    """
+    Whether a task is done or still active
+    """
     DONE = auto()
     ACTIVE = auto()
 
     @staticmethod
     def from_json(data: str) -> "TaskStatus":
+        # TODO DRY this to simply fetch dynamically based on keys and label sent
+        """
+        Get a TaskStatus from a string
+        :param data: the string to generate the enum from
+        :return: the generated TaskStatus enum
+        """
         if data == "DONE":
             return TaskStatus.DONE
         if data == "ACTIVE":
@@ -177,6 +245,13 @@ class TaskStatus(Enum):
 
 @dataclass
 class Task:
+    """
+    Tasks are mostly used for type of activity (eg. design, coding) while description field
+    for the actual thing you’ve worked on (eg. “Working on bug #213”).
+    For more advanced task management,
+    it’s best to use a dedicated project management tool like Trello, JIRA, etc.
+    Source: https://clockify.me/help/projects/working-with-tasks
+    """
     uid: str
     assignee_id: str
     estimate: timedelta
@@ -195,6 +270,14 @@ class Task:
 
 @dataclass
 class TimeEntry:
+    """
+    An entry for a given work session, with a start time, and and endtime,
+    and thereby a duration.
+    It is connected to a usr and potentially a project and task.
+    it can either be billable or not.
+
+    Read more: https://clockify.me/help/tutorials/tutorial-time-tracking
+    """
     billable: bool
     locked: bool
     description: str
@@ -230,6 +313,13 @@ class TimeEntry:
 
 @dataclass
 class Project:
+    """
+    A project for grouping time entries.
+    It can potentially be connected to a client, and have an associated hourly rate etc.
+    Can contain multiple users.
+
+    read more: https://clockify.me/help/tutorials/project-management-tutorial
+    """
     uid: str
     name: str
     public: bool
@@ -261,6 +351,10 @@ class Project:
 
 @dataclass
 class User:
+    """
+    A user on Clockify, with associated projects and workspaces.
+    """
+
     active_workspace_id: str
     default_workspace_id: str
     email: str
